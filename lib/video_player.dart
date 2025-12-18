@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-
-int _selectedIndexVideo = 1;
+int _selectedIndex = 0;
 
 List<String> _src = [
-  'https://persian21.cdn.asset.aparat.com/aparat-video/58001a1926912f4b175a5ab1e9e32b9867004084-240p.mp4?wmsAuthSign=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbiI6IjZjNzI3NjJiMmQ1ZTM1ODUyMjE0NWE0MTQ5NjVjODVjIiwiZXhwIjoxNzY1OTM0NzE1LCJpc3MiOiJTYWJhIElkZWEgR1NJRyJ9.vA3cCPTO-YMugAzcCuYm10PegtSUu6GHFlsLFvzfx_Y',
-  'https://aspb32.cdn.asset.aparat.com/aparat-video/ca96fb1a37d33cdfdb4cd26193bf48a239375382-360p.mp4?wmsAuthSign=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbiI6Ijc0M2ZjYmY4OTgwZWVhNzgwMTMxOWVhOGFiZTZiZWU1IiwiZXhwIjoxNzY1OTM0Nzc1LCJpc3MiOiJTYWJhIElkZWEgR1NJRyJ9.bwyPiAnZpE6E1S7aBjl6_dO8fHcDl_xpxxg92waZsuY',
+  'https://static.cdn.asset.aparat.com/avt/62017945_15s.mp4',
+  'https://static.cdn.asset.aparat.com/avt/62137266_15s.mp4',
+  'https://static.cdn.asset.aparat.com/avt/61986552_15s.mp4',
 ];
 
 class VideoPlayerPage extends StatefulWidget {
@@ -20,22 +20,43 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   late VideoPlayerController _controller;
 
+  bool _isReady = false;
+
   @override
   void initState() {
     super.initState();
 
-    _controller = VideoPlayerController.networkUrl(Uri.parse(_src[_selectedIndexVideo]));
+    _controller = VideoPlayerController.networkUrl(
+      Uri.parse(_src[_selectedIndex]),
+    );
 
-    _controller.initialize().then((value) {
-      setState(() {});
-    });
+    _initVideoPlayer();
+  }
 
-    _controller.play();
+  Future<void> _initVideoPlayer() async {
+    try {
+      await _controller.initialize();
+
+      _controller.setLooping(true);
+
+      await _controller.play();
+
+      setState(() {
+        _isReady = true;
+      });
+    } catch (e) {
+      debugPrint('🔴 video init error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-
     var size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -45,30 +66,182 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           height: size.height,
           width: size.width,
           child: Stack(
-            alignment: .center,
             children: [
-              Positioned(
-                child: AspectRatio(
-                  aspectRatio: _controller.value.aspectRatio,
-                  child: VideoPlayer(_controller)
-                ),
+              Center(
+                child: _isReady
+                    ? AspectRatio(
+                        aspectRatio: _controller.value.aspectRatio,
+                        child: VideoPlayer(_controller),
+                      )
+                    : const CircularProgressIndicator(),
               ),
-          
+
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: Container(
-                  color: Colors.green.withValues(alpha: .2),
-                  height: 100,
+                  color: Colors.black,
+                  padding: const EdgeInsets.only(bottom: 24, top: 10),
                   width: size.width,
-                  child: Center(child: Text('Controllers')),
+                  child: Column(
+                    spacing: 20,
+                    children: [
+                      // controlls
+                      Row(
+                        crossAxisAlignment: .center,
+                        mainAxisAlignment: .center,
+                        spacing: 12,
+                        children: [
+                          // previous
+                          ControllerIconButton(
+                            function: () {
+                      
+                              _selectedIndex--;
+                      
+                              _selectedIndex %= _src.length;
+                      
+                              onChangeVideo();
+                      
+                            },
+                            icon: Icons.skip_previous,
+                            iconColor: Colors.white,
+                            iconSize: 45,
+                          ),
+                      
+                          // rewind
+                          ControllerIconButton(
+                            function: () async {
+                      
+                              final position = await _controller.position;
+                      
+                              final targetPosition = position!.inMilliseconds - 10000;
+                      
+                              await _controller.seekTo(Duration(milliseconds: targetPosition));
+                      
+                            },
+                            icon: Icons.replay_10,
+                            iconColor: Colors.white,
+                            iconSize: 45,
+                          ),
+                      
+                          // play or puase
+                          ControllerIconButton(
+                            icon: _controller.value.isPlaying
+                              ? Icons.pause_circle_filled
+                              : Icons.play_circle_fill,
+                            iconColor: Colors.green,
+                            function: () async {
+                              _controller.value.isPlaying
+                                  ? await _controller.pause()
+                                  : await _controller.play();
+                      
+                              setState(() {});
+                            },
+                            iconSize: 65,
+                          ),
+                      
+                          // forward
+                          ControllerIconButton(
+                            function: () async {
+                      
+                              final position = await _controller.position;
+                      
+                              final targetPosition = position!.inMilliseconds + 10000;
+                      
+                              await _controller.seekTo(Duration(milliseconds: targetPosition));
+                      
+                            },
+                            icon: Icons.forward_10,
+                            iconColor: Colors.white,
+                            iconSize: 45,
+                          ),
+                      
+                          // next
+                          ControllerIconButton(
+                            function: () {
+                      
+                              _selectedIndex++;
+                      
+                              _selectedIndex %= _src.length;
+                      
+                              onChangeVideo();
+                      
+                            },
+                            icon: Icons.skip_next,
+                            iconColor: Colors.white,
+                            iconSize: 45,
+                          ),
+                        ],
+                      ),
+                    
+                      // progress bar
+                      VideoProgressIndicator(
+                        _controller,
+                        allowScrubbing: true,
+                        padding: EdgeInsets.symmetric(horizontal: 24),
+                        colors: VideoProgressColors(
+                          playedColor: Colors.greenAccent,
+                          backgroundColor: Colors.grey
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-        )
+        ),
       ),
+    );
+  }
+
+  void onChangeVideo(){
+    _controller.dispose();
+
+    _controller = VideoPlayerController.networkUrl(
+      Uri.parse(_src[_selectedIndex])
+    );
+    
+    _controller.addListener(
+      () {
+        setState(() {
+          if (!_controller.value.isPlaying && 
+              _controller.value.isInitialized && 
+              _controller.value.duration == _controller.value.position
+          ) {
+            _controller.seekTo(Duration.zero);
+          }
+        });  
+      },
+    );
+
+    _controller.initialize().then((value) => setState(() {
+      _controller.play();
+    }));
+  }
+
+}
+
+class ControllerIconButton extends StatelessWidget {
+  const ControllerIconButton({
+    super.key,
+    required this.icon,
+    required this.iconColor,
+    required this.function,
+    required this.iconSize,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final double iconSize;
+  final Function() function;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: function,
+      icon: Icon(icon, size: iconSize, color: iconColor),
     );
   }
 }
